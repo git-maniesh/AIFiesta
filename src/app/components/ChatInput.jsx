@@ -16,6 +16,7 @@ const ChatInput = ({
   setModelResponse,
   setModelLoading,
   modelVisible,
+  modelResponse,
 }) => {
   const [userText, setUserText] = useState("");
   const [file, setFile] = useState(null);
@@ -54,53 +55,73 @@ const ChatInput = ({
     setUserText("");
     removeFile();
 
-    // Call all models
+    // Call models individually based on visibility
     if (modelVisible.gemini) {
       setModelLoading((prev) => ({ ...prev, geminiLoading: true }));
-      const geminiResponse = await handleFetchGeminiResponse(userText, file);
-      const data = geminiResponse.candidates[0].content.parts[0].text;
-      setModelResponse((prev) => ({
-        ...prev,
-        geminiResponse: [
-          ...(prev.geminiResponse || []),
-          { role: "user", text: userText, file: fileData },
-          { role: "assistant", text: data },
-        ],
-      }));
-      setModelLoading((prev) => ({ ...prev, geminiLoading: false }));
+      const geminiHistory = [
+        ...(modelResponse?.geminiResponse || []),
+        { role: "user", text: userText }
+      ];
+      handleFetchGeminiResponse(geminiHistory).then((data) => {
+        setModelResponse((prev) => ({
+          ...prev,
+          geminiResponse: [
+            ...(prev.geminiResponse || []),
+            { role: "user", text: userText, file: fileData },
+            { role: "assistant", text: data },
+          ],
+        }));
+        setModelLoading((prev) => ({ ...prev, geminiLoading: false }));
+      }).catch((error) => {
+        setModelLoading((prev) => ({ ...prev, geminiLoading: false }));
+      });
     }
 
     if (modelVisible.chatgpt) {
       setModelLoading((prev) => ({ ...prev, chatgptLoading: true }));
-      const response = await handleFetchChatGPTResponse(userText, file);
-      setModelResponse((prev) => ({
-        ...prev,
-        chatgptResponse: [
-          ...(prev.chatgptResponse || []),
-          { role: "user", text: userText, file: fileData },
-          { role: "assistant", text: response },
-        ],
-      }));
-      setModelLoading((prev) => ({ ...prev, chatgptLoading: false }));
+      const chatgptHistory = [
+        ...(modelResponse?.chatgptResponse || []),
+        { role: "user", text: userText }
+      ];
+      handleFetchChatGPTResponse(chatgptHistory).then((response) => {
+        setModelResponse((prev) => ({
+          ...prev,
+          chatgptResponse: [
+            ...(prev.chatgptResponse || []),
+            { role: "user", text: userText, file: fileData },
+            { role: "assistant", text: response },
+          ],
+        }));
+        setModelLoading((prev) => ({ ...prev, chatgptLoading: false }));
+      }).catch((error) => {
+        setModelLoading((prev) => ({ ...prev, chatgptLoading: false }));
+      });
     }
 
     if (modelVisible.deepseek) {
       setModelLoading((prev) => ({ ...prev, deepseekLoading: true }));
-      const response = await handleFetchDeepSeekResponse(userText, file);
-      setModelResponse((prev) => ({
-        ...prev,
-        deepseekResponse: [
-          ...(prev.deepseekResponse || []),
-          { role: "user", text: userText, file: fileData },
-          { role: "assistant", text: response },
-        ],
-      }));
-      setModelLoading((prev) => ({ ...prev, deepseekLoading: false }));
+      const deepseekHistory = [
+        ...(modelResponse?.deepseekResponse || []),
+        { role: "user", text: userText }
+      ];
+      handleFetchDeepSeekResponse(deepseekHistory).then((response) => {
+        setModelResponse((prev) => ({
+          ...prev,
+          deepseekResponse: [
+            ...(prev.deepseekResponse || []),
+            { role: "user", text: userText, file: fileData },
+            { role: "assistant", text: response },
+          ],
+        }));
+        setModelLoading((prev) => ({ ...prev, deepseekLoading: false }));
+      }).catch((error) => {
+        setModelLoading((prev) => ({ ...prev, deepseekLoading: false }));
+      });
     }
   };
 
   return (
-    <div className="fixed bottom-5 left-1/2 transform -translate-x-1/2 w-11/12 max-w-4xl flex flex-col gap-2">
+    <div className="w-full max-w-4xl mx-auto flex flex-col gap-2">
       {/* File Preview */}
       {filePreview && (
         <div className="flex items-center justify-between bg-gray-700 rounded-lg p-2">

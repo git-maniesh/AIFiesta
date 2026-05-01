@@ -1,72 +1,82 @@
-// import { Completions } from "openai/resources/chat/completions";
-import { FETCH_DEEPSEEK, FETCH_GEMINI } from "../utils/app.constants";
-import OpenAI from "openai";
-
-const handleFetchGeminiResponse = async (prompt) => {
+const handleFetchGeminiResponse = async (history) => {
   try {
-    // console.log("Prompt:", prompt);
-    // console.log("Body sent to Gemini:", JSON.stringify(body, null, 2));
-
-    const response = await fetch(FETCH_GEMINI, {
+    const response = await fetch("/api/chat", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-goog-api-key": process.env.NEXT_PUBLIC_GEMINI_API_KEY,
       },
-      //api_key
-      //   console.log("Body sent to Gemini:", JSON.stringify(body, null, 2));
-
       body: JSON.stringify({
-        contents: [
-          {
-            role: "user",
-            parts: [
-              {
-                text: prompt,
-              },
-            ],
-          },
-        ],
+        messages: history.map(h => ({ role: h.role, content: h.text })),
+        model: "google/gemma-2-2b-it",
       }),
     });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
     const data = await response.json();
-    // console.log(data);
-    return data;
+    if (data.error) throw new Error(data.error);
+    
+    return data.content;
   } catch (error) {
-    console.log("Gemini API Failed", error);
+    console.error("Gemini (Gemma) API Failed", error);
+    return "Error generating response.";
   }
 };
 
-const handleFetchChatGPTResponse = async (prompt) => {
-  const client = new OpenAI({
-    apiKey: process.env.NEXT_PUBLIC_CHATGPT_API_KEY,
-    dangerouslyAllowBrowser: true,
-  });
-
-  const response = await client.responses.create({
-    model: "gpt-3.5-turbo",
-    input: prompt,
-  });
-  const responseData = completion.choices[0].message.content;
-//   console.log(responseData);
-
-  return responseData;
+const handleFetchChatGPTResponse = async (history) => {
+  try {
+    const response = await fetch("/api/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messages: history.map(h => ({ role: h.role, content: h.text })),
+        model: "meta/llama-3.1-70b-instruct",
+      }),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    if (data.error) throw new Error(data.error);
+    
+    return data.content;
+  } catch (error) {
+    console.error("ChatGPT (Llama) API Failed", error);
+    return "Error generating response.";
+  }
 };
 
-const handleFetchDeepSeekResponse = async (prompt) => {
-  const openai = new OpenAI({
-    baseURL: FETCH_DEEPSEEK,
-    apiKey: process.env.NEXT_PUBLIC_DEEPSEEK_API_KEY,
-    dangerouslyAllowBrowser: true,
-  });
-  const completion = await openai.chat.completions.create({
-    messages:[{role:"system", content:prompt}],
-    model:"deepseek/deepseek-r1:free"
-
-  })
-  const responseData =completion.choices[0].message.content;
-
-  return responseData;
+const handleFetchDeepSeekResponse = async (history) => {
+  try {
+    const response = await fetch("/api/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messages: history.map(h => ({ role: h.role, content: h.text })),
+        model: "deepseek-ai/deepseek-v4-flash",
+      }),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    if (data.error) throw new Error(data.error);
+    
+    return data.content;
+  } catch (error) {
+    console.error("DeepSeek API Failed", error);
+    return "Error generating response.";
+  }
 };
 
 export {
