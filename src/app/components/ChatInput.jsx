@@ -1,7 +1,7 @@
 
 
 import Image from "next/image";
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import SendIcon from "../../../public/send.svg";
 import clsx from "clsx";
 import {
@@ -17,10 +17,27 @@ const ChatInput = ({
   setModelLoading,
   modelVisible,
   modelResponse,
+  modelLoading,
+  onStopAll,
+  onSendAll,
 }) => {
   const [userText, setUserText] = useState("");
   const [file, setFile] = useState(null);
   const [filePreview, setFilePreview] = useState(null);
+  const textareaRef = useRef(null);
+
+  // Function to adjust textarea height
+  const adjustHeight = () => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
+    }
+  };
+
+  // Adjust height on mount or whenever text changes (as backup)
+  useEffect(() => {
+    adjustHeight();
+  }, [userText]);
 
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
@@ -49,76 +66,24 @@ const ChatInput = ({
     setPromptText(userText);
     setUserPrompts((prev) => [...prev, userText]);
 
-    const fileData = file ? { name: file.name, type: file.type } : null;
+    const currentText = userText;
 
     // Clear input and file
     setUserText("");
     removeFile();
-
+    
+    // Reset height immediately
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+    }
+    
     // Call models individually based on visibility
-    if (modelVisible.gemini) {
-      setModelLoading((prev) => ({ ...prev, geminiLoading: true }));
-      const geminiHistory = [
-        ...(modelResponse?.geminiResponse || []),
-        { role: "user", text: userText }
-      ];
-      handleFetchGeminiResponse(geminiHistory).then((data) => {
-        setModelResponse((prev) => ({
-          ...prev,
-          geminiResponse: [
-            ...(prev.geminiResponse || []),
-            { role: "user", text: userText, file: fileData },
-            { role: "assistant", text: data },
-          ],
-        }));
-        setModelLoading((prev) => ({ ...prev, geminiLoading: false }));
-      }).catch((error) => {
-        setModelLoading((prev) => ({ ...prev, geminiLoading: false }));
-      });
-    }
-
-    if (modelVisible.chatgpt) {
-      setModelLoading((prev) => ({ ...prev, chatgptLoading: true }));
-      const chatgptHistory = [
-        ...(modelResponse?.chatgptResponse || []),
-        { role: "user", text: userText }
-      ];
-      handleFetchChatGPTResponse(chatgptHistory).then((response) => {
-        setModelResponse((prev) => ({
-          ...prev,
-          chatgptResponse: [
-            ...(prev.chatgptResponse || []),
-            { role: "user", text: userText, file: fileData },
-            { role: "assistant", text: response },
-          ],
-        }));
-        setModelLoading((prev) => ({ ...prev, chatgptLoading: false }));
-      }).catch((error) => {
-        setModelLoading((prev) => ({ ...prev, chatgptLoading: false }));
-      });
-    }
-
-    if (modelVisible.deepseek) {
-      setModelLoading((prev) => ({ ...prev, deepseekLoading: true }));
-      const deepseekHistory = [
-        ...(modelResponse?.deepseekResponse || []),
-        { role: "user", text: userText }
-      ];
-      handleFetchDeepSeekResponse(deepseekHistory).then((response) => {
-        setModelResponse((prev) => ({
-          ...prev,
-          deepseekResponse: [
-            ...(prev.deepseekResponse || []),
-            { role: "user", text: userText, file: fileData },
-            { role: "assistant", text: response },
-          ],
-        }));
-        setModelLoading((prev) => ({ ...prev, deepseekLoading: false }));
-      }).catch((error) => {
-        setModelLoading((prev) => ({ ...prev, deepseekLoading: false }));
-      });
-    }
+    if (modelVisible.gemini) onSendAll("gemini", currentText);
+    if (modelVisible.chatgpt) onSendAll("chatgpt", currentText);
+    if (modelVisible.deepseek) onSendAll("deepseek", currentText);
   };
+
+  const isLoading = modelLoading.geminiLoading || modelLoading.chatgptLoading || modelLoading.deepseekLoading;
 
   return (
     <div className="w-full max-w-4xl mx-auto flex flex-col gap-2">
@@ -144,38 +109,70 @@ const ChatInput = ({
       )}
 
       {/* Input + Buttons */}
-      <div className="flex items-center bg-cod-gray border border-mine-shaft rounded-2xl p-2 gap-2">
-        <input
-          type="text"
+      <div className="flex items-end bg-cod-gray border border-mine-shaft rounded-2xl p-2 gap-2 relative">
+        <textarea
+          ref={textareaRef}
+          rows="1"
           value={userText}
-          className="flex-1 outline-none text-white bg-transparent px-3 py-2 rounded-l-2xl"
+          className="flex-1 outline-none text-white bg-transparent px-3 py-2 rounded-l-2xl resize-none max-h-[200px] overflow-y-auto no-scrollbar"
           placeholder="Ask Me Anything..."
-          onChange={(e) => setUserText(e.target.value)}
+          onChange={(e) => {
+            setUserText(e.target.value);
+            // Instant height adjustment
+            e.target.style.height = "auto";
+            e.target.style.height = `${Math.min(e.target.scrollHeight, 200)}px`;
+          }}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && (userText.trim() || file)) {
-              handleSendPrompt();
+            // Enter key handling
+            if (e.key === "Enter") {
+              // If Shift is pressed, allow the default behavior (new line)
+              if (e.shiftKey) {
+                return;
+              }
+              
+              // If only Enter is pressed, send the message and prevent new line
               e.preventDefault();
+              if ((userText.trim() || file) && !isLoading) {
+                handleSendPrompt();
+              }
             }
           }}
         />
 
-        {/* File Upload Button */}
-        <label className="bg-gray-700 p-2 rounded-md cursor-pointer flex-shrink-0">
-          <input type="file" className="hidden" onChange={handleFileChange} />
-          📎
-        </label>
+        <div className="flex items-center gap-2 mb-1">
+          {/* File Upload Button */}
+          <label className="bg-gray-700/50 hover:bg-gray-700 p-2 rounded-xl cursor-pointer flex-shrink-0 transition-colors">
+            <input type="file" className="hidden" onChange={handleFileChange} />
+            <span className="text-xl">📎</span>
+          </label>
 
-        {/* Send Button */}
-        <button
-          className={clsx(
-            "bg-ocean-green p-3 rounded-r-2xl flex-shrink-0",
-            !userText.trim() && !file ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+          {/* Send / Stop Button */}
+          {isLoading ? (
+            <button
+              className="bg-red-500 p-3 rounded-xl flex-shrink-0 transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer"
+              onClick={onStopAll}
+              title="Stop Generation"
+            >
+              <div className="w-5 h-5 bg-white rounded-sm" /> {/* Stop Icon (Square) */}
+            </button>
+          ) : (
+            <button
+              className={clsx(
+                "bg-ocean-green p-3 rounded-xl flex-shrink-0 transition-all duration-200",
+                !userText.trim() && !file ? "opacity-50 cursor-not-allowed scale-95" : "cursor-pointer hover:scale-105 active:scale-95"
+              )}
+              disabled={!userText.trim() && !file}
+              onClick={handleSendPrompt}
+            >
+              <Image src={SendIcon} width={20} height={20} alt="SendIcon" />
+            </button>
           )}
-          disabled={!userText.trim() && !file}
-          onClick={handleSendPrompt}
-        >
-          <Image src={SendIcon} width={20} height={20} alt="SendIcon" />
-        </button>
+        </div>
+      </div>
+      
+      {/* Tooltip for keyboard shortcuts */}
+      <div className="text-[10px] text-gray-500 flex justify-end px-2">
+        <span><b>Enter</b> to send, <b>Shift + Enter</b> for new line</span>
       </div>
     </div>
   );

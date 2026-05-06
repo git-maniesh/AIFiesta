@@ -11,13 +11,30 @@ export async function POST(request) {
       apiKey: process.env.NEXT_PUBLIC_NVIDIA_API_KEY,
     });
 
-    const completion = await openai.chat.completions.create({
+    const stream = await openai.chat.completions.create({
       messages: messages,
       model: model,
       max_tokens: 1024,
+      stream: true,
     });
 
-    return Response.json({ content: completion.choices[0].message.content });
+    const readableStream = new ReadableStream({
+      async start(controller) {
+        for await (const chunk of stream) {
+          const content = chunk.choices[0]?.delta?.content || "";
+          if (content) {
+            controller.enqueue(new TextEncoder().encode(content));
+          }
+        }
+        controller.close();
+      },
+    });
+
+    return new Response(readableStream, {
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+      },
+    });
   } catch (error) {
     console.error("API Route Error:", error);
     return Response.json({ error: "Error generating response" }, { status: 500 });

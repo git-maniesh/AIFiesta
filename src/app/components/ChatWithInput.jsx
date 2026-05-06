@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import ChatSection from "./ChatSection";
 import {
   CHATGPT_IMG_URL,
@@ -27,37 +27,63 @@ const ChatWithInput = ({ setUserPrompts, modelResponse, setModelResponse }) => {
     deepseekLoading: false,
   });
 
+  const abortControllers = useRef({
+    chatgpt: null,
+    gemini: null,
+    deepseek: null,
+  });
+
+  const stopModelGeneration = (modelKey) => {
+    if (abortControllers.current[modelKey]) {
+      abortControllers.current[modelKey].abort();
+      abortControllers.current[modelKey] = null;
+      setModelLoading((prev) => ({ ...prev, [`${modelKey}Loading`]: false }));
+    }
+  };
+
   const handleIndividualSend = (modelKey, text) => {
-    if (modelKey === "chatgpt") {
-      setModelLoading((prev) => ({ ...prev, chatgptLoading: true }));
-      const history = [...(modelResponse.chatgptResponse || []), { role: "user", text }];
-      handleFetchChatGPTResponse(history).then((response) => {
-        setModelResponse((prev) => ({
+    const controller = new AbortController();
+    abortControllers.current[modelKey] = controller;
+
+    const history = [...(modelResponse[`${modelKey}Response`] || []), { role: "user", text }];
+    
+    // Initial state with user message and empty assistant message for loading
+    setModelResponse((prev) => ({
+      ...prev,
+      [`${modelKey}Response`]: [...history, { role: "assistant", text: "" }],
+    }));
+    setModelLoading((prev) => ({ ...prev, [`${modelKey}Loading`]: true }));
+
+    const onChunk = (fullText) => {
+      setModelResponse((prev) => {
+        const currentHistory = prev[`${modelKey}Response`];
+        const updatedHistory = [...currentHistory];
+        // The last message is the assistant message we're streaming into
+        if (updatedHistory.length > 0) {
+          updatedHistory[updatedHistory.length - 1] = {
+            ...updatedHistory[updatedHistory.length - 1],
+            text: fullText
+          };
+        }
+        return {
           ...prev,
-          chatgptResponse: [...history, { role: "assistant", text: response }],
-        }));
-        setModelLoading((prev) => ({ ...prev, chatgptLoading: false }));
-      }).catch(() => setModelLoading((prev) => ({ ...prev, chatgptLoading: false })));
-    } else if (modelKey === "gemini") {
-      setModelLoading((prev) => ({ ...prev, geminiLoading: true }));
-      const history = [...(modelResponse.geminiResponse || []), { role: "user", text }];
-      handleFetchGeminiResponse(history).then((response) => {
-        setModelResponse((prev) => ({
-          ...prev,
-          geminiResponse: [...history, { role: "assistant", text: response }],
-        }));
-        setModelLoading((prev) => ({ ...prev, geminiLoading: false }));
-      }).catch(() => setModelLoading((prev) => ({ ...prev, geminiLoading: false })));
-    } else if (modelKey === "deepseek") {
-      setModelLoading((prev) => ({ ...prev, deepseekLoading: true }));
-      const history = [...(modelResponse.deepseekResponse || []), { role: "user", text }];
-      handleFetchDeepSeekResponse(history).then((response) => {
-        setModelResponse((prev) => ({
-          ...prev,
-          deepseekResponse: [...history, { role: "assistant", text: response }],
-        }));
-        setModelLoading((prev) => ({ ...prev, deepseekLoading: false }));
-      }).catch(() => setModelLoading((prev) => ({ ...prev, deepseekLoading: false })));
+          [`${modelKey}Response`]: updatedHistory,
+        };
+      });
+    };
+
+    let fetchFunc;
+    if (modelKey === "chatgpt") fetchFunc = handleFetchChatGPTResponse;
+    else if (modelKey === "gemini") fetchFunc = handleFetchGeminiResponse;
+    else if (modelKey === "deepseek") fetchFunc = handleFetchDeepSeekResponse;
+
+    if (fetchFunc) {
+      fetchFunc(history, controller.signal, onChunk)
+        .then((finalResponse) => {
+          if (finalResponse === null) return;
+          setModelLoading((prev) => ({ ...prev, [`${modelKey}Loading`]: false }));
+        })
+        .catch(() => setModelLoading((prev) => ({ ...prev, [`${modelKey}Loading`]: false })));
     }
   };
 
@@ -65,45 +91,55 @@ const ChatWithInput = ({ setUserPrompts, modelResponse, setModelResponse }) => {
     <div className="bg-cod-gray2 flex flex-col w-full h-screen">
       <div className="flex flex-1 overflow-hidden">
         <ChatSection
-        modelName={"ChatGPT"}
-        imgUrl={CHATGPT_IMG_URL}
-        modelVisible={modelVisible}
-        setModelVisible={setModelVisible}
-        promptText={promptText}
-        modelMessage={modelResponse.chatgptResponse}
-        loading={modelLoading.chatgptLoading}
-        onSend={(text) => handleIndividualSend("chatgpt", text)}
-      />
-      <ChatSection
-        modelName={"Gemini"}
-        imgUrl={GEMINI_IMG_URL}
-        modelVisible={modelVisible}
-        setModelVisible={setModelVisible}
-        promptText={promptText}
-        modelMessage={modelResponse.geminiResponse}
-        loading={modelLoading.geminiLoading}
-        onSend={(text) => handleIndividualSend("gemini", text)}
-      />
-      <ChatSection
-        modelName={"DeepSeek"}
-        imgUrl={DEEPSEEK_IMG_URL}
-        modelVisible={modelVisible}
-        setModelVisible={setModelVisible}
-        promptText={promptText}
-        modelMessage={modelResponse.deepseekResponse}
-        loading={modelLoading.deepseekLoading}
-        onSend={(text) => handleIndividualSend("deepseek", text)}
-      />
+          modelName={"ChatGPT"}
+          imgUrl={CHATGPT_IMG_URL}
+          modelVisible={modelVisible}
+          setModelVisible={setModelVisible}
+          promptText={promptText}
+          modelMessage={modelResponse.chatgptResponse}
+          loading={modelLoading.chatgptLoading}
+          onSend={(text) => handleIndividualSend("chatgpt", text)}
+          onStop={() => stopModelGeneration("chatgpt")}
+        />
+        <ChatSection
+          modelName={"Gemini"}
+          imgUrl={GEMINI_IMG_URL}
+          modelVisible={modelVisible}
+          setModelVisible={setModelVisible}
+          promptText={promptText}
+          modelMessage={modelResponse.geminiResponse}
+          loading={modelLoading.geminiLoading}
+          onSend={(text) => handleIndividualSend("gemini", text)}
+          onStop={() => stopModelGeneration("gemini")}
+        />
+        <ChatSection
+          modelName={"DeepSeek"}
+          imgUrl={DEEPSEEK_IMG_URL}
+          modelVisible={modelVisible}
+          setModelVisible={setModelVisible}
+          promptText={promptText}
+          modelMessage={modelResponse.deepseekResponse}
+          loading={modelLoading.deepseekLoading}
+          onSend={(text) => handleIndividualSend("deepseek", text)}
+          onStop={() => stopModelGeneration("deepseek")}
+        />
       </div>
       <div className="p-4 bg-cod-gray border-t border-mine-shaft">
         <ChatInput
-        setUserPrompts={setUserPrompts}
-        setPromptText={setPromptText}
-        setModelResponse={setModelResponse}
-        setModelLoading={setModelLoading}
-        modelVisible={modelVisible}
-        modelResponse={modelResponse}
-      />
+          setUserPrompts={setUserPrompts}
+          setPromptText={setPromptText}
+          setModelResponse={setModelResponse}
+          setModelLoading={setModelLoading}
+          modelVisible={modelVisible}
+          modelResponse={modelResponse}
+          modelLoading={modelLoading}
+          onStopAll={() => {
+            stopModelGeneration("chatgpt");
+            stopModelGeneration("gemini");
+            stopModelGeneration("deepseek");
+          }}
+          onSendAll={handleIndividualSend}
+        />
       </div>
     </div>
   );
