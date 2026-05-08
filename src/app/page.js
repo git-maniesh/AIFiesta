@@ -6,17 +6,19 @@ import Sidebar from "./components/Sidebar";
 const App = () => {
   const [userPrompts, setUserPrompts] = useState([]);
   const [modelResponse, setModelResponse] = useState({
-    chatgptResponse: [],
-    geminiResponse: [],
-    deepseekResponse: [],
+    metaResponse: [],
+    googleResponse: [],
+    mistralResponse: [],
+    minimaxResponse: [],
   });
 
   const handleNewChat = () => {
     setUserPrompts([]);
     setModelResponse({
-      chatgptResponse: [],
-      geminiResponse: [],
-      deepseekResponse: [],
+      metaResponse: [],
+      googleResponse: [],
+      mistralResponse: [],
+      minimaxResponse: [],
     });
   };
 

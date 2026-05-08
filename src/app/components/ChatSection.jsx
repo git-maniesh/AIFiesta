@@ -130,7 +130,7 @@ const ChatSection = ({
     );
   }
   return (
-    <div className="w-full h-full border-r border-l border-mine-shaft flex flex-col">
+    <div className="flex-1 min-w-0 h-full border-r border-l border-mine-shaft flex flex-col transition-all duration-300 overflow-hidden">
       {/* Header */}
       <div className="bg-cod-gray border-b border-mine-shaft flex items-center justify-between p-4 text-white flex-shrink-0">
         <div className="flex items-center justify-center gap-2">
@@ -163,13 +163,13 @@ const ChatSection = ({
       {/* Messages Area */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto p-4 no-scrollbar scroll-smooth"
+        className="flex-1 overflow-y-auto p-4 no-scrollbar scroll-smooth bg-[#121212]/50"
       >
         {modelMessage &&
           modelMessage.map((msg, index) => (
-            <div key={index} className="flex items-start gap-3 mb-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div key={index} className="flex items-start gap-4 mb-8 group animate-in fade-in slide-in-from-bottom-2 duration-500">
               {msg.role === "user" ? (
-                <div className="bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full w-8 h-8 flex-shrink-0 flex items-center justify-center shadow-lg shadow-purple-500/20">
+                <div className="bg-gradient-to-br from-purple-600 to-blue-600 rounded-full w-9 h-9 flex-shrink-0 flex items-center justify-center shadow-lg shadow-purple-500/20 ring-2 ring-white/10">
                   <Image
                     src={UserIcon}
                     height={20}
@@ -179,53 +179,65 @@ const ChatSection = ({
                 </div>
               ) : (
                 <div className="flex-shrink-0">
-                  <img
-                    src={imgUrl}
-                    height={32}
-                    width={32}
-                    alt="model"
-                    className={clsx(
-                      "rounded-lg shadow-md",
-                      modelName === "ChatGPT" ? "bg-white p-0.5" : ""
-                    )}
-                  />
+                  <div className="relative">
+                    <img
+                      src={imgUrl}
+                      height={36}
+                      width={36}
+                      alt="model"
+                      className={clsx(
+                        "rounded-xl shadow-xl border border-white/10 transition-transform group-hover:scale-105",
+                        modelName === "ChatGPT" ? "bg-white p-1" : "bg-[#1e1e1e]"
+                      )}
+                    />
+                    <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-[#121212] animate-pulse"></div>
+                  </div>
                 </div>
               )}
-              <div className="text-white text-sm w-full max-w-[92%] overflow-hidden">
-                <div className="prose prose-invert max-w-none leading-relaxed">
-                  <ReactMarkDown 
-                    remarkPlugins={[remarkGfm]}
-                    components={{
-                      code: CodeBlock,
-                      p: ({children}) => <p className="mb-4 text-gray-300 last:mb-0">{children}</p>,
-                      h1: ({children}) => <h1 className="text-2xl font-bold mb-4 mt-6 text-white first:mt-0">{children}</h1>,
-                      h2: ({children}) => <h2 className="text-xl font-bold mb-3 mt-5 text-white first:mt-0">{children}</h2>,
-                      h3: ({children}) => <h3 className="text-lg font-semibold mb-3 mt-4 text-white first:mt-0">{children}</h3>,
-                      ul: ({children}) => <ul className="list-disc pl-6 mb-4 space-y-1 text-gray-300">{children}</ul>,
-                      ol: ({children}) => <ol className="list-decimal pl-6 mb-4 space-y-1 text-gray-300">{children}</ol>,
-                      li: ({children}) => <li className="pl-1">{children}</li>,
-                      blockquote: ({children}) => (
-                        <blockquote className="border-l-4 border-ocean-green bg-ocean-green/5 py-2 pl-4 pr-2 rounded-r-lg italic my-4 text-gray-400">
-                          {children}
-                        </blockquote>
-                      ),
-                      table: ({children}) => (
-                        <div className="overflow-x-auto my-4 rounded-xl border border-gray-700 shadow-sm">
-                          <table className="w-full border-collapse text-left text-xs">
-                            {children}
-                          </table>
-                        </div>
-                      ),
-                      thead: ({children}) => <thead className="bg-gray-800/80">{children}</thead>,
-                      th: ({children}) => <th className="px-4 py-3 font-semibold text-white border-b border-gray-700">{children}</th>,
-                      td: ({children}) => <td className="px-4 py-3 border-b border-gray-800 text-gray-300">{children}</td>,
-                      a: ({children, href}) => <a href={href} target="_blank" rel="noopener noreferrer" className="text-ocean-green hover:underline font-medium">{children}</a>,
-                      hr: () => <hr className="my-6 border-gray-800" />,
-                      strong: ({children}) => <strong className="font-bold text-white">{children}</strong>,
-                    }}
-                  >
-                    {msg.text}
-                  </ReactMarkDown>
+              <div className="flex-1 min-w-0">
+                <div className={clsx(
+                  "text-[15px] leading-relaxed tracking-wide",
+                  msg.role === "user" ? "text-white/90 whitespace-pre-wrap font-medium bg-white/5 p-3 rounded-2xl rounded-tl-none border border-white/5" : "text-gray-200"
+                )}>
+                  {msg.role === "user" ? (
+                    msg.text
+                  ) : (
+                    <div className="prose prose-invert max-w-none">
+                      <ReactMarkDown 
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          code: CodeBlock,
+                          p: ({children}) => <p className="mb-5 text-gray-300/90 leading-7 last:mb-0">{children}</p>,
+                          h1: ({children}) => <h1 className="text-2xl font-bold mb-6 mt-8 text-white tracking-tight border-b border-white/10 pb-2 first:mt-0">{children}</h1>,
+                          h2: ({children}) => <h2 className="text-xl font-semibold mb-4 mt-6 text-white tracking-tight first:mt-0">{children}</h2>,
+                          h3: ({children}) => <h3 className="text-lg font-semibold mb-3 mt-5 text-white/90 first:mt-0">{children}</h3>,
+                          ul: ({children}) => <ul className="list-disc pl-6 mb-5 space-y-2 text-gray-300/80">{children}</ul>,
+                          ol: ({children}) => <ol className="list-decimal pl-6 mb-5 space-y-2 text-gray-300/80">{children}</ol>,
+                          li: ({children}) => <li className="pl-1 leading-relaxed">{children}</li>,
+                          blockquote: ({children}) => (
+                            <blockquote className="border-l-4 border-purple-500 bg-purple-500/5 py-3 pl-5 pr-3 rounded-r-xl italic my-6 text-gray-300 shadow-inner">
+                              {children}
+                            </blockquote>
+                          ),
+                          table: ({children}) => (
+                            <div className="overflow-x-auto my-6 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm shadow-xl">
+                              <table className="w-full border-collapse text-left text-sm">
+                                {children}
+                              </table>
+                            </div>
+                          ),
+                          thead: ({children}) => <thead className="bg-white/10">{children}</thead>,
+                          th: ({children}) => <th className="px-5 py-3.5 font-bold text-white border-b border-white/10 uppercase text-xs tracking-wider">{children}</th>,
+                          td: ({children}) => <td className="px-5 py-4 border-b border-white/5 text-gray-300 transition-colors hover:bg-white/5">{children}</td>,
+                          a: ({children, href}) => <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline underline-offset-4 decoration-2 transition-colors font-medium">{children}</a>,
+                          hr: () => <hr className="my-8 border-white/10" />,
+                          strong: ({children}) => <strong className="font-bold text-white shadow-white/10">{children}</strong>,
+                        }}
+                      >
+                        {msg.text}
+                      </ReactMarkDown>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

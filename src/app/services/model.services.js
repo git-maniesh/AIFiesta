@@ -13,20 +13,36 @@ const fetchStreamingResponse = async (history, model, signal, onChunk) => {
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
     }
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let fullText = "";
+    let lastUpdate = Date.now();
+    let buffer = "";
 
     while (true) {
       const { done, value } = await reader.read();
-      if (done) break;
+      if (done) {
+        if (buffer) {
+          fullText += buffer;
+          if (onChunk) onChunk(fullText);
+        }
+        break;
+      }
 
       const chunk = decoder.decode(value, { stream: true });
-      fullText += chunk;
-      if (onChunk) onChunk(fullText);
+      buffer += chunk;
+
+      const now = Date.now();
+      if (now - lastUpdate > 40) {
+        fullText += buffer;
+        if (onChunk) onChunk(fullText);
+        buffer = "";
+        lastUpdate = now;
+      }
     }
 
     return fullText;
@@ -35,25 +51,32 @@ const fetchStreamingResponse = async (history, model, signal, onChunk) => {
       console.log(`${model} request aborted`);
       return null;
     }
+    const errorMsg = `Error: ${error.message}`;
+    if (onChunk) onChunk(errorMsg);
     console.error(`${model} API Failed`, error);
-    return "Error generating response.";
+    return errorMsg;
   }
 };
 
-const handleFetchGeminiResponse = async (history, signal, onChunk) => {
-  return fetchStreamingResponse(history, "google/gemma-2-2b-it", signal, onChunk);
+const handleFetchMetaResponse = async (history, signal, onChunk) => {
+  return fetchStreamingResponse(history, "meta/llama-3.1-8b-instruct", signal, onChunk);
 };
 
-const handleFetchChatGPTResponse = async (history, signal, onChunk) => {
-  return fetchStreamingResponse(history, "meta/llama-3.1-70b-instruct", signal, onChunk);
+const handleFetchGoogleResponse = async (history, signal, onChunk) => {
+  return fetchStreamingResponse(history, "google/gemma-4-31b-it", signal, onChunk);
 };
 
-const handleFetchDeepSeekResponse = async (history, signal, onChunk) => {
-  return fetchStreamingResponse(history, "deepseek-ai/deepseek-v4-flash", signal, onChunk);
+const handleFetchMistralResponse = async (history, signal, onChunk) => {
+  return fetchStreamingResponse(history, "mistralai/mixtral-8x7b-instruct-v0.1", signal, onChunk);
+};
+
+const handleFetchMiniMaxResponse = async (history, signal, onChunk) => {
+  return fetchStreamingResponse(history, "deepseek-ai/deepseek-v3", signal, onChunk);
 };
 
 export {
-  handleFetchChatGPTResponse,
-  handleFetchDeepSeekResponse,
-  handleFetchGeminiResponse,
+  handleFetchMetaResponse,
+  handleFetchGoogleResponse,
+  handleFetchMistralResponse,
+  handleFetchMiniMaxResponse,
 };
